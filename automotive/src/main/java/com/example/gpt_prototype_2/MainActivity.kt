@@ -2,6 +2,8 @@ package com.example.myautomotiveapp
 
 import android.content.Intent
 import android.os.Bundle
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
@@ -20,13 +22,24 @@ import java.util.Locale
 class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private lateinit var tts: TextToSpeech
-    private val SPEECH_REQUEST_CODE = 0
+    private lateinit var speechLauncher: ActivityResultLauncher<Intent>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         tts = TextToSpeech(this, this)
+
+        speechLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                val data = result.data
+                data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.let {
+                    val spokenText = it[0]
+                    getChatGPTResponse(spokenText)
+                }
+            }
+        }
+
         startVoiceRecognition()
     }
 
@@ -35,17 +48,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
         }
-        startActivityForResult(intent, SPEECH_REQUEST_CODE)
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == SPEECH_REQUEST_CODE && resultCode == RESULT_OK) {
-            data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.let {
-                val spokenText = it[0]
-                getChatGPTResponse(spokenText)
-            }
-        }
+        speechLauncher.launch(intent)
     }
 
     override fun onInit(status: Int) {
